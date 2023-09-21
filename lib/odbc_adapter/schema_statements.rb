@@ -61,6 +61,7 @@ module ODBCAdapter
     def columns(table_name, _name = nil)
       stmt   = @connection.columns(native_case(table_name.to_s))
       puts "~~~~~~#{stmt.inspect}"
+      puts "~~~~~~#{stmt.to_s}"
       puts "~~~~~~#{table_name.to_s}"
       puts "~~~~~~#{native_case(table_name.to_s)}"
       result = stmt.fetch_all || []
