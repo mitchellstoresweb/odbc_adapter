@@ -7,7 +7,7 @@ module ODBCAdapter
         /my.*sql/i  => :MySQL,
         /postgres/i => :PostgreSQL,
         /snowflake/i => :Snowflake,
-        /DB2\/400 SQL/i  => :MySQL,
+        /db2\/400sql/i  => :MySQL,
       }
     end
 
