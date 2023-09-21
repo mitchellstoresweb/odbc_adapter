@@ -62,7 +62,7 @@ module ODBCAdapter
       stmt   = @connection.columns(native_case(table_name.to_s))
       result = stmt.fetch_all || []
       stmt.drop
-
+      puts "~~~~~~#{result.inspect}"
       result.each_with_object([]) do |col, cols|
         col_name        = col[3]  # SQLColumns: COLUMN_NAME
         col_default     = col[12] # SQLColumns: COLUMN_DEF
@@ -82,7 +82,9 @@ module ODBCAdapter
           args[:precision] = col_limit
         end
         sql_type_metadata = ActiveRecord::ConnectionAdapters::SqlTypeMetadata.new(**args)
-
+        puts "~~~~~~#{sql_type_metadata}"
+        puts "~~~~~~#{col_name}"
+        puts "~~~~~~#{format_case(col_name)}"
         cols << new_column(format_case(col_name), col_default, sql_type_metadata, col_nullable, table_name, col_native_type)
       end
     end

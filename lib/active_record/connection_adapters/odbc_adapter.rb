@@ -32,9 +32,7 @@ module ActiveRecord
           end
 
         database_metadata = ::ODBCAdapter::DatabaseMetadata.new(connection)
-        t = database_metadata.adapter_class.new(connection, logger, config, database_metadata)
-        puts "~~~~~odbc_connection:#{t.class.name}"
-        t
+        database_metadata.adapter_class.new(connection, logger, config, database_metadata)
       end
 
       private
