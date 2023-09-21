@@ -20,6 +20,7 @@ module ODBCAdapter
     end
 
     def adapter_class
+      puts "~~~~~~#{dbms_name}"
       ODBCAdapter.adapter_for(dbms_name)
     end
 
