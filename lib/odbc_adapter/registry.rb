@@ -12,6 +12,7 @@ module ODBCAdapter
     end
 
     def adapter_for(reported_name)
+      puts "~~~~~~#{reported_name}"
       reported_name = reported_name.downcase.gsub(/\s/, '')
       found =
         dbs.detect do |pattern, adapter|
