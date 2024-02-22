@@ -10,9 +10,9 @@ module ODBCAdapter
     def execute(sql, name = nil, binds = [])
       log(sql, name) do
         if prepared_statements
-          @connection.do(sql, *prepared_binds(binds))
+          @raw_connection.do(sql, *prepared_binds(binds))
         else
-          @connection.do(sql)
+          @raw_connection.do(sql)
         end
       end
     end
@@ -20,13 +20,13 @@ module ODBCAdapter
     # Executes +sql+ statement in the context of this connection using
     # +binds+ as the bind substitutes. +name+ is logged along with
     # the executed +sql+ statement.
-    def exec_query(sql, name = 'SQL', binds = [], prepare: false) # rubocop:disable Lint/UnusedMethodArgument
+    def internal_exec_query(sql, name = 'SQL', binds = [], prepare: false) # rubocop:disable Lint/UnusedMethodArgument
       log(sql, name) do
         stmt =
           if prepared_statements
-            @connection.run(sql, *prepared_binds(binds))
+            @raw_connection.run(sql, *prepared_binds(binds))
           else
-            @connection.run(sql)
+            @raw_connection.run(sql)
           end
 
         columns = stmt.columns
@@ -49,20 +49,20 @@ module ODBCAdapter
 
     # Begins the transaction (and turns off auto-committing).
     def begin_db_transaction
-      @connection.autocommit = false
+      @raw_connection.autocommit = false
     end
 
     # Commits the transaction (and turns on auto-committing).
     def commit_db_transaction
-      @connection.commit
-      @connection.autocommit = true
+      @raw_connection.commit
+      @raw_connection.autocommit = true
     end
 
     # Rolls back the transaction (and turns on auto-committing). Must be
     # done if the transaction block raises an exception or returns false.
     def exec_rollback_db_transaction
-      @connection.rollback
-      @connection.autocommit = true
+      @raw_connection.rollback
+      @raw_connection.autocommit = true
     end
 
     # Returns the default sequence name for a table.
