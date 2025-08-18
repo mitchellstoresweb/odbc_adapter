@@ -21,8 +21,9 @@ module ActiveRecord
       # Build a new ODBC connection with the given configuration.
       def odbc_connection(config)
         config = config.symbolize_keys
-
-        connection, config =
+        # In Rails 8, we need to determine the adapter class first, but we'll
+        # let Rails handle the actual connection establishment
+        temp_connection, temp_config = 
           if config.key?(:dsn)
             odbc_dsn_connection(config)
           elsif config.key?(:conn_str)
@@ -30,9 +31,24 @@ module ActiveRecord
           else
             raise ArgumentError, 'No data source name (:dsn) or connection string (:conn_str) specified.'
           end
-
-        database_metadata = ::ODBCAdapter::DatabaseMetadata.new(connection)
-        database_metadata.adapter_class.new(connection, logger, config, database_metadata)
+        
+        begin
+          # Get the appropriate adapter class
+          database_metadata = ::ODBCAdapter::DatabaseMetadata.new(temp_connection)
+          adapter_class = database_metadata.adapter_class
+          
+          # Close the temporary connection since the adapter will establish its own
+          temp_connection.disconnect if temp_connection.respond_to?(:disconnect)
+          
+          # Create adapter with config - connection will be established lazily when needed
+          final_config = config.merge(temp_config.is_a?(Hash) ? temp_config : {})
+          adapter = adapter_class.new(final_config)
+          
+          adapter
+        rescue => e
+          temp_connection.disconnect if temp_connection&.respond_to?(:disconnect)
+          raise e
+        end
       end
 
       private
@@ -98,13 +114,29 @@ module ActiveRecord
 
       # The object that stores the information that is fetched from the DBMS
       # when a connection is first established.
-      attr_reader :database_metadata
+      def database_metadata
+        ensure_connection
+        @database_metadata
+      end
 
-      def initialize(connection, logger, config, database_metadata)
-        configure_time_options(connection)
-        super(connection, logger, config)
-        @database_metadata = database_metadata
-        @raw_connection = connection
+      def initialize(config_or_deprecated_connection, deprecated_logger = nil, deprecated_connection_options = nil, deprecated_config = nil)
+        # Handle the new Rails 8 signature vs legacy signature
+        if config_or_deprecated_connection.is_a?(Hash)
+          # New Rails 8 style: config is passed as first argument
+          super(config_or_deprecated_connection)
+          @database_metadata = nil # Will be set when connection is established
+        else
+          # Legacy style: connection, logger, config, database_metadata
+          connection = config_or_deprecated_connection
+          logger = deprecated_logger
+          config = deprecated_connection_options
+          database_metadata = deprecated_config
+          
+          super(config)
+          @database_metadata = database_metadata
+          @raw_connection = connection
+          configure_time_options(@raw_connection) if @raw_connection
+        end
       end
 
       # Returns the human-readable name of the adapter.
@@ -125,11 +157,39 @@ module ActiveRecord
 
       # CONNECTION MANAGEMENT ====================================
 
+      # Establishes a connection to the database. Called by Rails 8 during connection setup.
+      def connect
+        puts "establishing ODBC connection via connect method"
+        
+        # Determine connection method based on config
+        @raw_connection, connection_config = 
+          if @config[:dsn]
+            ActiveRecord::Base.send(:odbc_dsn_connection, @config)
+          elsif @config[:conn_str]
+            ActiveRecord::Base.send(:odbc_conn_str_connection, @config)
+          else
+            raise ArgumentError, 'No data source name (:dsn) or connection string (:conn_str) specified.'
+          end
+        
+        # Create database metadata from the established connection
+        @database_metadata = ::ODBCAdapter::DatabaseMetadata.new(@raw_connection)
+        
+        # Configure time options for the connection
+        configure_time_options(@raw_connection)
+        
+        # Update config with any additional settings from connection establishment
+        @config = @config.merge(connection_config) if connection_config.is_a?(Hash)
+        
+        @raw_connection
+      end
+
       # Checks whether the connection to the database is still active. This
       # includes checking whether the database is actually capable of
       # responding, i.e. whether the connection isn't stale.
       def active?
-        @raw_connection.connected?
+        # Ensure connection is established before checking if it's active
+        ensure_connection
+        @raw_connection&.connected?
       end
 
       # Disconnects from the database if already connected, and establishes a
@@ -219,6 +279,14 @@ module ActiveRecord
       end
 
       private
+
+      # Ensures that a connection is established if it doesn't exist
+      def ensure_connection
+        return if @raw_connection && @database_metadata
+        
+        puts "ensuring connection is established"
+        connect unless @raw_connection
+      end
 
       # Can't use the built-in ActiveRecord map#alias_type because it doesn't
       # work with non-string keys, and in our case the keys are (almost) all
