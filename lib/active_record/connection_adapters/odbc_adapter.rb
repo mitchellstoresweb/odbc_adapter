@@ -100,6 +100,7 @@ module ActiveRecord
           name = name.to_s
           # If already fully quoted, return as-is
           return name if name.include?('"') && name.start_with?('"') && name.end_with?('"')
+          
           # If it contains a dot (schema.table or table.column), handle each part
           if name.include?('.')
             parts = name.split('.')
@@ -107,7 +108,14 @@ module ActiveRecord
               part.strip.start_with?('"') && part.strip.end_with?('"') ? part : "\"#{part}\"" 
             }.join('.')
           else
-            "\"#{name}\""
+            # For simple column names (like those from alias_attribute resolution),
+            # check if they look like database column names (lowercase, no spaces)
+            # If so, don't quote them as they're likely already resolved column names
+            if name.match?(/\A[a-z][a-z0-9_]*\z/)
+              name
+            else
+              "\"#{name}\""
+            end
           end
         end
 
@@ -213,7 +221,7 @@ module ActiveRecord
       def active?
         # Ensure connection is established before checking if it's active
         ensure_connection
-        @raw_connection&.connected?
+        !!@raw_connection&.connected?
       end
 
       # Disconnects from the database if already connected, and establishes a
@@ -234,7 +242,7 @@ module ActiveRecord
       # Disconnects from the database if already connected. Otherwise, this
       # method does nothing.
       def disconnect!
-        @raw_connection.disconnect if @raw_connection.connected?
+        @raw_connection.disconnect if !!@raw_connection&.connected?
       end
 
       # Build a new column object from the given options. Effectively the same
