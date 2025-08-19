@@ -94,35 +94,6 @@ module ActiveRecord
       ERR_QUERY_TIMED_OUT         = 57_014
       ERR_QUERY_TIMED_OUT_MESSAGE = /Query has timed out/
 
-      # Rails 8 class methods for quoting - these are called during SQL generation
-      class << self
-        def quote_column_name(name)
-          name = name.to_s
-          # If already fully quoted, return as-is
-          return name if name.include?('"') && name.start_with?('"') && name.end_with?('"')
-          
-          # If it contains a dot (schema.table or table.column), handle each part
-          if name.include?('.')
-            parts = name.split('.')
-            parts.map { |part| 
-              part.strip.start_with?('"') && part.strip.end_with?('"') ? part : "\"#{part}\"" 
-            }.join('.')
-          else
-            # For simple column names (like those from alias_attribute resolution),
-            # check if they look like database column names (lowercase, no spaces)
-            # If so, don't quote them as they're likely already resolved column names
-            if name.match?(/\A[a-z][a-z0-9_]*\z/)
-              name
-            else
-              "\"#{name}\""
-            end
-          end
-        end
-
-        def quote_table_name(name)
-          quote_column_name(name)
-        end
-      end
 
       # The object that stores the information that is fetched from the DBMS
       # when a connection is first established.
@@ -156,25 +127,6 @@ module ActiveRecord
         ADAPTER_NAME
       end
 
-      # Override Rails 8's abstract quoting methods to ensure our implementation is used
-      def quote_column_name(name)
-        ensure_connection
-        name = name.to_s
-        quote_char = database_metadata.identifier_quote_char.to_s.strip
-
-        return name if quote_char.length.zero?
-        quote_char = quote_char[0]
-
-        # Avoid quoting any already quoted name
-        return name if name[0] == quote_char && name[-1] == quote_char
-
-        # If upcase identifiers, only quote mixed case names.
-        if database_metadata.upcase_identifiers?
-          return name unless name =~ /([A-Z]+[a-z])|([a-z]+[A-Z])/
-        end
-
-        "#{quote_char.chr}#{name}#{quote_char.chr}"
-      end
 
       # Does this adapter support migrations? Backend specific, as the abstract
       # adapter always returns +false+.
@@ -191,9 +143,6 @@ module ActiveRecord
 
       # Establishes a connection to the database. Called by Rails 8 during connection setup.
       def connect
-        puts "establishing ODBC connection via connect method"
-        
-        # Determine connection method based on config
         @raw_connection, connection_config = 
           if @config[:dsn]
             ActiveRecord::Base.send(:odbc_dsn_connection, @config)
