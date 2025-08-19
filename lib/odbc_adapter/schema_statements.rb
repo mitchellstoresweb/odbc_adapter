@@ -59,6 +59,7 @@ module ODBCAdapter
     # Returns an array of Column objects for the table specified by
     # +table_name+.
     def columns(table_name, _name = nil)
+      ensure_connection
       stmt   = @raw_connection.columns(native_case(table_name.to_s))
       result = stmt.fetch_all || []
       stmt.drop
