@@ -264,8 +264,6 @@ module ActiveRecord
       # Ensures that a connection is established if it doesn't exist
       def ensure_connection
         return if @raw_connection && @database_metadata
-        
-        puts "ensuring connection is established"
         connect unless @raw_connection
       end
 
