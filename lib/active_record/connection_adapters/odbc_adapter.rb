@@ -21,9 +21,7 @@ module ActiveRecord
       # Build a new ODBC connection with the given configuration.
       def odbc_connection(config)
         config = config.symbolize_keys
-        # In Rails 8, we need to determine the adapter class first, but we'll
-        # let Rails handle the actual connection establishment
-        temp_connection, temp_config = 
+        connection, config =
           if config.key?(:dsn)
             odbc_dsn_connection(config)
           elsif config.key?(:conn_str)
@@ -31,24 +29,8 @@ module ActiveRecord
           else
             raise ArgumentError, 'No data source name (:dsn) or connection string (:conn_str) specified.'
           end
-        
-        begin
-          # Get the appropriate adapter class
-          database_metadata = ::ODBCAdapter::DatabaseMetadata.new(temp_connection)
-          adapter_class = database_metadata.adapter_class
-          
-          # Close the temporary connection since the adapter will establish its own
-          temp_connection.disconnect if temp_connection.respond_to?(:disconnect)
-          
-          # Create adapter with config - connection will be established lazily when needed
-          final_config = config.merge(temp_config.is_a?(Hash) ? temp_config : {})
-          adapter = adapter_class.new(final_config)
-          
-          adapter
-        rescue => e
-          temp_connection.disconnect if temp_connection&.respond_to?(:disconnect)
-          raise e
-        end
+        database_metadata = ::ODBCAdapter::DatabaseMetadata.new(connection)
+        database_metadata.adapter_class.new(connection, logger, config, database_metadata)
       end
 
       private
