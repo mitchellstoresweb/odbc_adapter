@@ -8,6 +8,7 @@ module ODBCAdapter
     # Executes the SQL statement in the context of this connection.
     # Returns the number of rows affected.
     def execute(sql, name = nil, binds = [])
+      ensure_connection
       log(sql, name) do
         if prepared_statements
           @raw_connection.do(sql, *prepared_binds(binds))
@@ -20,7 +21,8 @@ module ODBCAdapter
     # Executes +sql+ statement in the context of this connection using
     # +binds+ as the bind substitutes. +name+ is logged along with
     # the executed +sql+ statement.
-    def internal_exec_query(sql, name = 'SQL', binds = [], prepare: false) # rubocop:disable Lint/UnusedMethodArgument
+    def internal_exec_query(sql, name = 'SQL', binds = [], prepare: false, **kwargs) # rubocop:disable Lint/UnusedMethodArgument
+      ensure_connection
       log(sql, name) do
         stmt =
           if prepared_statements
@@ -128,7 +130,7 @@ module ODBCAdapter
     end
 
     def prepared_binds(binds)
-      binds.map(&:value_for_database).map { |bind| _type_cast(bind) }
+      binds.map(&:value_for_database)
     end
   end
 end
