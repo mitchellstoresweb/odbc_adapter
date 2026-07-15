@@ -51,11 +51,13 @@ module ODBCAdapter
 
     # Begins the transaction (and turns off auto-committing).
     def begin_db_transaction
+      ensure_connection
       @raw_connection.autocommit = false
     end
 
     # Commits the transaction (and turns on auto-committing).
     def commit_db_transaction
+      ensure_connection
       @raw_connection.commit
       @raw_connection.autocommit = true
     end
@@ -63,6 +65,7 @@ module ODBCAdapter
     # Rolls back the transaction (and turns on auto-committing). Must be
     # done if the transaction block raises an exception or returns false.
     def exec_rollback_db_transaction
+      ensure_connection
       @raw_connection.rollback
       @raw_connection.autocommit = true
     end
