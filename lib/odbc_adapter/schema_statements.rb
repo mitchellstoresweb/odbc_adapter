@@ -10,7 +10,7 @@ module ODBCAdapter
     # Returns an array of table names, for database tables visible on the
     # current connection.
     def tables(_name = nil)
-      stmt   = @connection.tables
+      stmt   = @raw_connection.tables
       result = stmt.fetch_all || []
       stmt.drop
 
@@ -28,7 +28,7 @@ module ODBCAdapter
 
     # Returns an array of indexes for the given table.
     def indexes(table_name, _name = nil)
-      stmt   = @connection.indexes(native_case(table_name.to_s))
+      stmt   = @raw_connection.indexes(native_case(table_name.to_s))
       result = stmt.fetch_all || []
       stmt.drop unless stmt.nil?
 
@@ -59,14 +59,11 @@ module ODBCAdapter
     # Returns an array of Column objects for the table specified by
     # +table_name+.
     def columns(table_name, _name = nil)
-      stmt   = @connection.columns(native_case(table_name.to_s))
-      puts "~~~~~~#{stmt.inspect}"
-      puts "~~~~~~#{stmt.to_s}"
-      puts "~~~~~~#{table_name.to_s}"
-      puts "~~~~~~#{native_case(table_name.to_s)}"
+      ensure_connection
+      stmt   = @raw_connection.columns(native_case(table_name.to_s))
       result = stmt.fetch_all || []
       stmt.drop
-      puts "~~~~~~#{result.inspect}"
+
       result.each_with_object([]) do |col, cols|
         col_name        = col[3]  # SQLColumns: COLUMN_NAME
         col_default     = col[12] # SQLColumns: COLUMN_DEF
@@ -86,23 +83,21 @@ module ODBCAdapter
           args[:precision] = col_limit
         end
         sql_type_metadata = ActiveRecord::ConnectionAdapters::SqlTypeMetadata.new(**args)
-        puts "~~~~~~#{sql_type_metadata}"
-        puts "~~~~~~#{col_name}"
-        puts "~~~~~~#{format_case(col_name)}"
+
         cols << new_column(format_case(col_name), col_default, sql_type_metadata, col_nullable, table_name, col_native_type)
       end
     end
 
     # Returns just a table's primary key
     def primary_key(table_name)
-      stmt   = @connection.primary_keys(native_case(table_name.to_s))
+      stmt   = @raw_connection.primary_keys(native_case(table_name.to_s))
       result = stmt.fetch_all || []
       stmt.drop unless stmt.nil?
       result[0] && result[0][3]
     end
 
     def foreign_keys(table_name)
-      stmt   = @connection.foreign_keys(native_case(table_name.to_s))
+      stmt   = @raw_connection.foreign_keys(native_case(table_name.to_s))
       result = stmt.fetch_all || []
       stmt.drop unless stmt.nil?
 
